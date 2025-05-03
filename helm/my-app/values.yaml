@@ -48,7 +48,13 @@ affinity:
                   - my-app
           topologyKey: "kubernetes.io/hostname"
 
-
 env:
   - name: NODE_ENV
     value: "dev"
+  - name: DB_USER
+    value: "myuser"
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: db-secret
+        key: password

@@ -51,7 +51,14 @@ spec:
           env:
             {{- range .Values.env }}
             - name: {{ .name }}
-              value: {{ .value | quote }}
+              {{- if .value }}
+                value: {{ .value | quote }}
+              {{- else if .valueFrom }}
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ .valueFrom.secretKeyRef.name }}
+                    key: {{ .valueFrom.secretKeyRef.key }}
+              {{- end }}
             {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

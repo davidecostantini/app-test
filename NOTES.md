@@ -4,6 +4,7 @@ This is a simple code to build, test and deploy a containerized app on EKS via G
 
 # Prerequisites
 - A github account with AWS credentials as secrets
+- Secrets configured in the cluster for DB_USER and DB_PASSWORD
 
 # Descriptions
 Repo has both the infrastructure, in the 'infra' directory, and the CI/CD parts.
@@ -29,28 +30,3 @@ This is a simple code and is not what you expect to have in production therefore
 - Use OIDC/IAM roles instead of AWS credentials
 - To simplify the code the docker container is built twice, first is tested and later pushed to ECR and that's logically not correct as you want to deliver the exact artifact that has been tested.
 - Versions, CIDRs and other data are hardcoded while best would be to parametrize them and use variables
-
-
-# Extra K8S config (optional)
-These are configuration in case is necessary the 'secret' permission to load cluster secrets
-
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: secret-lister-role
-  namespace: default
-rules:
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["list", "get"]
-
-
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: github-list-secrets-binding
-  namespace: default
-roleRef:
-  kind: Role
-  name: <<replace_with_role_to_give_permission>>
-  apiGroup: rbac.authorization.k8s.io
