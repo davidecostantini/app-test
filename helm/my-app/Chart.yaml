@@ -1,0 +1,9 @@
+apiVersion: v2
+name: my-app
+description: A simple chart for deploying the app
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Davide DevOps
+    email: me@davidecostantini.it

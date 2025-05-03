@@ -10,12 +10,16 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/${{ github.event.repository.name }}
   DOCKER_BUILDKIT: 1
+  APP_NAME: my-app
+  APP_NAMESPACE: default
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/users_test
+  AWS_REGION: eu-west-1
   AWS_DEFAULT_REGION: us-east-1
   AWS_ACCESS_KEY_ID: test
   AWS_SECRET_ACCESS_KEY: test
   S3_BUCKET_NAME: user-queries
   PYTHONPATH: ${{ github.workspace }}
+  HELM_CHART_PATH: ./helm/my-app
 
 jobs:
   test-docker:
@@ -49,37 +53,37 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-        
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -e .
         pip install awscli
-        
+
     - name: Create test database
       run: |
         PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE users_test;'
-        
+
     - name: Set environment variables
       run: |
         echo "PYTEST_CURRENT_TEST=True" >> $GITHUB_ENV
         echo "AWS_SECURITY_TOKEN=testing" >> $GITHUB_ENV
         echo "AWS_SESSION_TOKEN=testing" >> $GITHUB_ENV
-        
+
     - name: Create S3 bucket in localstack
       run: |
         # Create the S3 bucket
         aws --endpoint-url=http://localhost:4566 s3 mb s3://user-queries
-        
+
         # Verify bucket creation
         aws --endpoint-url=http://localhost:4566 s3 ls
-        
+
     - name: Run Docker tests
       run: |
         pytest tests/test_docker.py -v
@@ -118,23 +122,23 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-        
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -e .
         pip install awscli
-        
+
     - name: Create test database
       run: |
         PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE users_test;'
-        
+
     - name: Set environment variables
       run: |
         echo "PYTEST_CURRENT_TEST=True" >> $GITHUB_ENV
@@ -143,21 +147,21 @@ jobs:
         echo "AWS_LAMBDA_FUNCTION_NAME=test-function" >> $GITHUB_ENV
         echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
         echo "AWS_EXECUTION_ENV=AWS_Lambda_python3.11" >> $GITHUB_ENV
-        
+
     - name: Create S3 bucket in localstack
       run: |
         # Create the S3 bucket
         aws --endpoint-url=http://localhost:4566 s3 mb s3://user-queries
-        
+
         # Verify bucket creation
         aws --endpoint-url=http://localhost:4566 s3 ls
-        
+
     - name: Run Lambda tests
       run: |
         # Run all direct Lambda tests
         echo "Running direct Lambda tests..."
         pytest tests/test_lambda.py -v
-      
+
       env:
         ENVIRONMENT: test
         AWS_ENDPOINT_URL: http://localhost:4566
@@ -171,23 +175,23 @@ jobs:
     permissions:
       contents: read
       packages: write
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
-      
+
     - name: Log in to GitHub Container Registry
       uses: docker/login-action@v2
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-        
+
     - name: Set lowercase image name
       run: echo "LOWERCASE_IMAGE_NAME=$(echo ${{ env.IMAGE_NAME }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-      
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v4
       with:
@@ -196,3 +200,91 @@ jobs:
         tags: ${{ env.REGISTRY }}/${{ env.LOWERCASE_IMAGE_NAME }}:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy App
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set lowercase image name
+        run: echo "LOWERCASE_IMAGE_NAME=$(echo ${{ env.IMAGE_NAME }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Update Helm values with new image
+        run: |
+          # Update image tag in values.yaml
+          sed -i "s|repository:.*|repository: ${{ env.REGISTRY }}/${{ env.LOWERCASE_IMAGE_NAME }}|g" ${{ env.HELM_CHART_PATH }}/values.yaml
+          sed -i "s|tag:.*|tag: ${{ github.sha }}|g" ${{ env.HELM_CHART_PATH }}/values.yaml
+          cat ${{ env.HELM_CHART_PATH }}/values.yaml
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}  --kubeconfig ./kubeconfig
+          echo 'KUBE_CONFIG_DATA<<EOF' >> $GITHUB_ENV
+          echo $(cat ./kubeconfig | base64) >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Helm deploy
+        uses: koslib/helm-eks-action@master
+        env:
+          # KUBECONFIG: ./kubeconfig # Alternative
+          KUBE_CONFIG_DATA: ${{ env.KUBE_CONFIG_DATA }}
+        with:
+          # plugins: "https://github.com/jkroepke/helm-secrets" # optional
+          command: helm upgrade --kubeconfig ./kubeconfig --install ${{ env.APP_NAME }} ${{ env.HELM_CHART_PATH }} --namespace ${{ env.APP_NAMESPACE }}
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/${{ env.APP_NAME }} -n ${{ env.APP_NAMESPACE }} --kubeconfig ./kubeconfig
+          kubectl get pods -n ${{ env.APP_NAMESPACE }} -l app=${{ env.APP_NAME }} --kubeconfig ./kubeconfig
+
+  notify-on-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    if: failure()
+    needs: [deploy]
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Notify via SNS (not configured, just as an example)
+        run: |
+          MESSAGE="ERROR: Pipeline failed in job: ${{ github.workflow }}. Commit: ${{ github.sha }}"
+          aws sns publish --topic-arn $SNS_TOPIC_ARN --message "$MESSAGE"
