@@ -12,6 +12,7 @@ env:
   DOCKER_BUILDKIT: 1
   APP_NAME: my-app
   APP_NAMESPACE: default
+  EKS_CLUSTER_NAME: eks-cluster-1
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/users_test
   AWS_REGION: eu-west-1
   AWS_DEFAULT_REGION: us-east-1
