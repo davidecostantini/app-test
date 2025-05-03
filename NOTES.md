@@ -11,6 +11,7 @@ Repo has both the infrastructure, in the 'infra' directory, and the CI/CD parts.
 The infrastructure is handled by the Terraform code which will deploy all necessary resources (Networking, RDS Postgres, EKS cluster and an S3 bucket for query results) in the correct order.
 Considering that's an example I've added to the script a feature at the end which allow to delete all resources created to clean up.
 The 'helm' directory contains the files to deploy the application which is built using the Dockerfile and stored in an AWS ECR repository, which is also created by Terraform.
+I've also included a notification step in the pipeline that uses an SNS topic but that's not configured and is just as an example of a possible way of managing notifications.
 
 # How to run
 To run the code first execute Terraform as follows:
