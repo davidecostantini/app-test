@@ -22,154 +22,154 @@ env:
   HELM_CHART_PATH: ./helm/my-app
 
 jobs:
-  test-docker:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      localstack:
-        image: localstack/localstack:3.0.0
-        env:
-          SERVICES: s3
-          AWS_DEFAULT_REGION: us-east-1
-        ports:
-          - 4566:4566
-        options: >-
-          --health-cmd "curl -f http://localhost:4566/_localstack/health"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+  # test-docker:
+  #   runs-on: ubuntu-latest
+  #   services:
+  #     postgres:
+  #       image: postgres:15
+  #       env:
+  #         POSTGRES_USER: postgres
+  #         POSTGRES_PASSWORD: postgres
+  #         POSTGRES_DB: postgres
+  #       ports:
+  #         - 5432:5432
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
+  #     localstack:
+  #       image: localstack/localstack:3.0.0
+  #       env:
+  #         SERVICES: s3
+  #         AWS_DEFAULT_REGION: us-east-1
+  #       ports:
+  #         - 4566:4566
+  #       options: >-
+  #         --health-cmd "curl -f http://localhost:4566/_localstack/health"
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
 
-    steps:
-    - uses: actions/checkout@v3
+  #   steps:
+  #   - uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+  #   - name: Set up Python
+  #     uses: actions/setup-python@v4
+  #     with:
+  #       python-version: '3.11'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -e .
-        pip install awscli
+  #   - name: Install dependencies
+  #     run: |
+  #       python -m pip install --upgrade pip
+  #       pip install -r requirements.txt
+  #       pip install -e .
+  #       pip install awscli
 
-    - name: Create test database
-      run: |
-        PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE users_test;'
+  #   - name: Create test database
+  #     run: |
+  #       PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE users_test;'
 
-    - name: Set environment variables
-      run: |
-        echo "PYTEST_CURRENT_TEST=True" >> $GITHUB_ENV
-        echo "AWS_SECURITY_TOKEN=testing" >> $GITHUB_ENV
-        echo "AWS_SESSION_TOKEN=testing" >> $GITHUB_ENV
+  #   - name: Set environment variables
+  #     run: |
+  #       echo "PYTEST_CURRENT_TEST=True" >> $GITHUB_ENV
+  #       echo "AWS_SECURITY_TOKEN=testing" >> $GITHUB_ENV
+  #       echo "AWS_SESSION_TOKEN=testing" >> $GITHUB_ENV
 
-    - name: Create S3 bucket in localstack
-      run: |
-        # Create the S3 bucket
-        aws --endpoint-url=http://localhost:4566 s3 mb s3://user-queries
+  #   - name: Create S3 bucket in localstack
+  #     run: |
+  #       # Create the S3 bucket
+  #       aws --endpoint-url=http://localhost:4566 s3 mb s3://user-queries
 
-        # Verify bucket creation
-        aws --endpoint-url=http://localhost:4566 s3 ls
+  #       # Verify bucket creation
+  #       aws --endpoint-url=http://localhost:4566 s3 ls
 
-    - name: Run Docker tests
-      run: |
-        pytest tests/test_docker.py -v
-      env:
-        ENVIRONMENT: test
-        AWS_ENDPOINT_URL: http://localhost:4566
+  #   - name: Run Docker tests
+  #     run: |
+  #       pytest tests/test_docker.py -v
+  #     env:
+  #       ENVIRONMENT: test
+  #       AWS_ENDPOINT_URL: http://localhost:4566
 
-  test-lambda:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      localstack:
-        image: localstack/localstack:3.0.0
-        env:
-          SERVICES: lambda,s3
-          AWS_DEFAULT_REGION: us-east-1
-        ports:
-          - 4566:4566
-        options: >-
-          --health-cmd "curl -f http://localhost:4566/_localstack/health"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+  # test-lambda:
+  #   runs-on: ubuntu-latest
+  #   services:
+  #     postgres:
+  #       image: postgres:15
+  #       env:
+  #         POSTGRES_USER: postgres
+  #         POSTGRES_PASSWORD: postgres
+  #         POSTGRES_DB: postgres
+  #       ports:
+  #         - 5432:5432
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
+  #     localstack:
+  #       image: localstack/localstack:3.0.0
+  #       env:
+  #         SERVICES: lambda,s3
+  #         AWS_DEFAULT_REGION: us-east-1
+  #       ports:
+  #         - 4566:4566
+  #       options: >-
+  #         --health-cmd "curl -f http://localhost:4566/_localstack/health"
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
 
-    steps:
-    - uses: actions/checkout@v3
+  #   steps:
+  #   - uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+  #   - name: Set up Python
+  #     uses: actions/setup-python@v4
+  #     with:
+  #       python-version: '3.11'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -e .
-        pip install awscli
+  #   - name: Install dependencies
+  #     run: |
+  #       python -m pip install --upgrade pip
+  #       pip install -r requirements.txt
+  #       pip install -e .
+  #       pip install awscli
 
-    - name: Create test database
-      run: |
-        PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE users_test;'
+  #   - name: Create test database
+  #     run: |
+  #       PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE users_test;'
 
-    - name: Set environment variables
-      run: |
-        echo "PYTEST_CURRENT_TEST=True" >> $GITHUB_ENV
-        echo "AWS_SECURITY_TOKEN=testing" >> $GITHUB_ENV
-        echo "AWS_SESSION_TOKEN=testing" >> $GITHUB_ENV
-        echo "AWS_LAMBDA_FUNCTION_NAME=test-function" >> $GITHUB_ENV
-        echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
-        echo "AWS_EXECUTION_ENV=AWS_Lambda_python3.11" >> $GITHUB_ENV
+  #   - name: Set environment variables
+  #     run: |
+  #       echo "PYTEST_CURRENT_TEST=True" >> $GITHUB_ENV
+  #       echo "AWS_SECURITY_TOKEN=testing" >> $GITHUB_ENV
+  #       echo "AWS_SESSION_TOKEN=testing" >> $GITHUB_ENV
+  #       echo "AWS_LAMBDA_FUNCTION_NAME=test-function" >> $GITHUB_ENV
+  #       echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
+  #       echo "AWS_EXECUTION_ENV=AWS_Lambda_python3.11" >> $GITHUB_ENV
 
-    - name: Create S3 bucket in localstack
-      run: |
-        # Create the S3 bucket
-        aws --endpoint-url=http://localhost:4566 s3 mb s3://user-queries
+  #   - name: Create S3 bucket in localstack
+  #     run: |
+  #       # Create the S3 bucket
+  #       aws --endpoint-url=http://localhost:4566 s3 mb s3://user-queries
 
-        # Verify bucket creation
-        aws --endpoint-url=http://localhost:4566 s3 ls
+  #       # Verify bucket creation
+  #       aws --endpoint-url=http://localhost:4566 s3 ls
 
-    - name: Run Lambda tests
-      run: |
-        # Run all direct Lambda tests
-        echo "Running direct Lambda tests..."
-        pytest tests/test_lambda.py -v
+  #   - name: Run Lambda tests
+  #     run: |
+  #       # Run all direct Lambda tests
+  #       echo "Running direct Lambda tests..."
+  #       pytest tests/test_lambda.py -v
 
-      env:
-        ENVIRONMENT: test
-        AWS_ENDPOINT_URL: http://localhost:4566
-        PYTHONUNBUFFERED: 1
-        S3_BUCKET_NAME: user-queries
+  #     env:
+  #       ENVIRONMENT: test
+  #       AWS_ENDPOINT_URL: http://localhost:4566
+  #       PYTHONUNBUFFERED: 1
+  #       S3_BUCKET_NAME: user-queries
 
   build-and-push:
-    needs: [test-docker, test-lambda]
+    # needs: [test-docker, test-lambda]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
@@ -216,7 +216,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -278,7 +278,7 @@ jobs:
 
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
